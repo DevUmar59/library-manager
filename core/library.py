@@ -19,6 +19,7 @@ and reviewed/modified by [Your Name]. See README.md for full GenAI statement.
 from __future__ import annotations
 
 import re
+from collections import deque
 from datetime import date, timedelta
 from typing import Deque, Dict, List, Optional
 
@@ -176,8 +177,18 @@ class Library:
             )
         if book.available_copies <= 0:
             raise UnavailableError(f"No copies of '{book.title}' are available. You can reserve it.")
+        # FR6: while a reservation queue exists, only the member at the front may borrow.
+        queue = self.reservations.get(book.isbn)
+        if queue:
+            if queue[0] != member.member_id:
+                raise UnavailableError(
+                    f"'{book.title}' is reserved; member {queue[0]} is first in the queue."
+                )
+            queue.popleft()
+            if not queue:
+                del self.reservations[book.isbn]
 
-        loan = Loan(book.isbn, member.member_id, today, today + timedelta(days=LOAN_PERIOD_DAYS))
+        loan =Loan(book.isbn, member.member_id, today, today + timedelta(days=LOAN_PERIOD_DAYS))
         self.loans.append(loan)
         book.available_copies -= 1
         return loan
@@ -213,8 +224,40 @@ class Library:
 
     # ---- Reservations (FR6) -----------------------------------------------
     def reserve_book(self, isbn: str, member_id: str) -> int:
-        """Add member to the book's FIFO queue; return their position."""
-        raise NotImplementedError
+        """Add member to the book's FIFO queue; return their position (FR6).
+
+        Positions are 1-based. Appending to a deque is O(1), and so is
+        removing the front member when they borrow the book.
+
+        Raises:
+            NotFoundError: unknown ISBN or member.
+            UnavailableError: a copy is available (issue it instead) or the
+                member already holds this book.
+            ValidationError: the member is already in this book's queue.
+        """
+        book = self.get_book(isbn)
+        member = self.get_member(member_id)
+        if book.available_copies > 0:
+            raise UnavailableError(
+                f"'{book.title}' has {book.available_copies} cop{'y' if book.available_copies == 1 else 'ies'} "
+                "available. Issue it instead of reserving."
+            )
+        if any(loan.isbn == book.isbn for loan in self.active_loans(member.member_id)):
+            raise UnavailableError(f"{member.name} already has '{book.title}' on loan.")
+        queue = self.reservations.setdefault(book.isbn, deque())
+        if member.member_id in queue:
+            raise ValidationError(f"{member.name} has already reserved '{book.title}'.")
+        queue.append(member.member_id)
+        return len(queue)
+
+    def next_in_queue(self, isbn: str) -> Optional[str]:
+        """Return the member ID at the front of a book's queue, or None (FR6)."""
+        queue = self.reservations.get(clean_isbn(isbn))
+        return queue[0] if queue else None
+
+    def reservation_queue(self, isbn: str) -> List[str]:
+        """Return a copy of a book's reservation queue, front first (FR6)."""
+        return list(self.reservations.get(clean_isbn(isbn), ()))
 
     # ---- Search & sort (FR7, FR8) ----------------------------------------
     def search_books(self, query: str, field: str = "title") -> List[Book]:
