@@ -264,3 +264,97 @@ class TestReservations(unittest.TestCase):
         self.library.return_book(GREAT, "M001", DUE_DAY)
         self.library.remove_book(GREAT)
         self.assertNotIn(GREAT, self.library.reservations)
+
+
+class TestSearchAndSort(unittest.TestCase):
+    """FR7 search, FR8 sorted listing, LO1 binary search by exact title."""
+
+    def setUp(self):
+        self.library = make_library()
+
+    def titles(self, books):
+        return [book.title for book in books]
+
+    def test_search_title_partial_and_case_insensitive(self):
+        self.assertEqual(self.titles(self.library.search_books("EYRE", "title")), ["Jane Eyre"])
+
+    def test_search_author_partial_returns_all_matches(self):
+        result = self.titles(self.library.search_books("austen", "author"))
+        self.assertEqual(result, ["Pride and Prejudice", "Emma"])
+
+    def test_search_isbn_exact_ignores_hyphens(self):
+        self.assertEqual(self.titles(self.library.search_books("978-0141439471", "isbn")), ["Emma"])
+
+    def test_search_isbn_partial_finds_nothing(self):
+        self.assertEqual(self.library.search_books("978014", "isbn"), [])
+
+    def test_search_no_match_returns_empty_list(self):
+        self.assertEqual(self.library.search_books("zzz", "title"), [])
+
+    def test_search_bad_field_or_blank_query_rejected(self):
+        with self.assertRaises(ValidationError):
+            self.library.search_books("x", "year")
+        with self.assertRaises(ValidationError):
+            self.library.search_books("   ", "title")
+
+    def test_sorted_by_title_ascending_case_insensitive(self):
+        self.library.add_book(NEW_ISBN, "a lowercase title", "Anon", 2000)
+        self.assertEqual(
+            self.titles(self.library.sorted_books("title")),
+            ["a lowercase title", "Emma", "Frankenstein", "Great Expectations",
+             "Jane Eyre", "Pride and Prejudice"],
+        )
+
+    def test_sorted_by_year_descending(self):
+        years = [book.year for book in self.library.sorted_books("year", reverse=True)]
+        self.assertEqual(years, [1861, 1847, 1818, 1815, 1813])
+
+    def test_sorted_by_author_keeps_insertion_order_for_ties(self):
+        # Both Jane Austen books share a key; merge sort is stable, so
+        # Pride and Prejudice (added first) stays before Emma.
+        result = self.titles(self.library.sorted_books("author"))
+        self.assertEqual(result[2:4], ["Pride and Prejudice", "Emma"])
+
+    def test_sorted_bad_field_rejected(self):
+        with self.assertRaises(ValidationError):
+            self.library.sorted_books("isbn")
+
+    def test_find_book_by_title_exact_uses_binary_search(self):
+        self.assertEqual(self.library.find_book_by_title_exact("frankenstein").isbn, FRANK)
+        self.assertIsNone(self.library.find_book_by_title_exact("Franken"))
+
+
+class TestOverdue(unittest.TestCase):
+    """FR9 overdue report."""
+
+    def setUp(self):
+        self.library = make_library()
+        self.library.issue_book(PRIDE, "M001", date(2026, 3, 10))  # due 24 Mar
+        self.library.issue_book(GREAT, "M002", date(2026, 3, 1))   # due 15 Mar
+        self.library.issue_book(FRANK, "M003", date(2026, 3, 20))  # due 3 Apr
+
+    def test_overdue_sorted_by_due_date(self):
+        overdue = self.library.overdue_loans(date(2026, 3, 30))
+        self.assertEqual([loan.isbn for loan in overdue], [GREAT, PRIDE])
+
+    def test_loan_due_today_is_not_overdue(self):
+        self.assertEqual(self.library.overdue_loans(date(2026, 3, 15)), [])
+
+    def test_returned_loans_are_not_overdue(self):
+        self.library.return_book(GREAT, "M002", date(2026, 3, 29))
+        overdue = self.library.overdue_loans(date(2026, 3, 30))
+        self.assertEqual([loan.isbn for loan in overdue], [PRIDE])
+
+
+class TestDictRoundTrip(unittest.TestCase):
+    """FR10 to_dict/from_dict keep all data, including reservation queues."""
+
+    def test_to_dict_from_dict_round_trip(self):
+        library = make_library()
+        library.issue_book(GREAT, "M001", ISSUE_DAY)
+        library.reserve_book(GREAT, "M002")
+        library.reserve_book(GREAT, "M003")
+        restored = Library.from_dict(library.to_dict())
+        self.assertEqual(restored.to_dict(), library.to_dict())
+        self.assertEqual(restored.reservation_queue(GREAT), ["M002", "M003"])
+        self.assertEqual(library.to_dict()["reservations"], {GREAT: ["M002", "M003"]})
