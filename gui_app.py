@@ -231,6 +231,56 @@ class BooksTab(BaseTab):
         self.app.perform(action)
 
 
+class MembersTab(BaseTab):
+    """Members: table of members and a registration form (FR3)."""
+
+    title = "Members"
+    COLUMNS: Sequence[Column] = (
+        ("member_id", "Member ID", 90),
+        ("name", "Name", 260),
+        ("loans", "Active loans", 100),
+    )
+
+    def __init__(self, parent: ttk.Notebook, app: "LibraryApp") -> None:
+        super().__init__(parent, app)
+        table, self.tree = self.make_table(self, self.COLUMNS)
+        table.grid(row=0, column=0, sticky="nsew")
+
+        form = ttk.LabelFrame(self, text="Register a member", padding=8)
+        form.grid(row=0, column=1, sticky="n", padx=(10, 0))
+        self.member_id = tk.StringVar()
+        self.name = tk.StringVar()
+        self.add_field(form, 0, "Member ID", ttk.Entry(form, textvariable=self.member_id, width=24))
+        ttk.Label(form, text="Format: M + 3 digits, e.g. M004", foreground="gray").grid(
+            row=1, column=1, sticky="w"
+        )
+        self.add_field(form, 2, "Name", ttk.Entry(form, textvariable=self.name, width=24))
+        ttk.Button(form, text="Register member", command=self.register).grid(
+            row=3, column=0, columnspan=2, sticky="ew", pady=(8, 0)
+        )
+        self.rowconfigure(0, weight=1)
+        self.columnconfigure(0, weight=1)
+
+    def refresh(self) -> None:
+        """Show every member with their number of active loans."""
+        self.fill_table(self.tree, (
+            (m.member_id, (m.member_id, m.name, len(self.library.active_loans(m.member_id))))
+            for m in self.library.list_members()
+        ))
+
+    def register(self) -> None:
+        """Register the member in the form (FR3)."""
+        member_id, name = self.member_id.get(), self.name.get()
+
+        def action() -> str:
+            member = self.library.register_member(member_id, name)
+            return f"Registered {member.name} as {member.member_id}."
+
+        if self.app.perform(action):
+            self.member_id.set("")
+            self.name.set("")
+
+
 class LibraryApp(tk.Tk):
     """Main window: menu bar, one tab per feature area and a status bar."""
 
@@ -348,7 +398,7 @@ class LibraryApp(tk.Tk):
 
 
 # Tabs shown in the notebook, in order.
-TAB_CLASSES: List[Type[BaseTab]] = [BooksTab]
+TAB_CLASSES: List[Type[BaseTab]] = [BooksTab, MembersTab]
 
 
 def main(data_path: Path = DEFAULT_DATA_FILE) -> None:
