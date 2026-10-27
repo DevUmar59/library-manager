@@ -15,7 +15,7 @@ and reviewed/modified by [Your Name]. See README.md for full GenAI statement.
 from __future__ import annotations
 
 import tkinter as tk
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from tkinter import messagebox, ttk
 from typing import Callable, Iterable, List, Optional, Sequence, Tuple, Type
@@ -281,6 +281,121 @@ class MembersTab(BaseTab):
             self.name.set("")
 
 
+def book_choices(library: Library) -> List[str]:
+    """Combobox entries 'ISBN - Title', ordered by title."""
+    return [f"{b.isbn} - {b.title}" for b in library.sorted_books("title")]
+
+
+def member_choices(library: Library) -> List[str]:
+    """Combobox entries 'ID - Name', ordered by member ID."""
+    return [f"{m.member_id} - {m.name}" for m in library.list_members()]
+
+
+class LoansTab(BaseTab):
+    """Loans: issue and return forms plus a table of active loans (FR4, FR5)."""
+
+    title = "Loans"
+    COLUMNS: Sequence[Column] = (
+        ("member", "Member", 150),
+        ("title", "Title", 210),
+        ("isbn", "ISBN", 115),
+        ("issued", "Issued", 90),
+        ("due", "Due", 90),
+        ("status", "Status", 80),
+    )
+
+    def __init__(self, parent: ttk.Notebook, app: "LibraryApp") -> None:
+        super().__init__(parent, app)
+        ttk.Label(self, text="Active loans (click a row to fill the form for a return)").grid(
+            row=0, column=0, sticky="w", pady=(0, 4)
+        )
+        table, self.tree = self.make_table(self, self.COLUMNS)
+        table.grid(row=1, column=0, sticky="nsew")
+        self.tree.tag_configure("overdue", foreground="#b00020")
+        self.tree.bind("<<TreeviewSelect>>", self.on_select)
+
+        form = ttk.LabelFrame(self, text="Issue or return", padding=8)
+        form.grid(row=1, column=1, sticky="n", padx=(10, 0))
+        self.book = tk.StringVar()
+        self.member = tk.StringVar()
+        self.book_box = ttk.Combobox(form, textvariable=self.book, width=30)
+        self.member_box = ttk.Combobox(form, textvariable=self.member, width=30)
+        self.add_field(form, 0, "Book", self.book_box)
+        self.add_field(form, 1, "Member", self.member_box)
+        ttk.Button(form, text="Issue book", command=self.issue).grid(
+            row=2, column=0, columnspan=2, sticky="ew", pady=(8, 0)
+        )
+        ttk.Button(form, text="Return book", command=self.return_book).grid(
+            row=3, column=0, columnspan=2, sticky="ew", pady=(4, 0)
+        )
+        self.rowconfigure(1, weight=1)
+        self.columnconfigure(0, weight=1)
+
+    def refresh(self) -> None:
+        """Show active loans (overdue ones in red) and update the dropdowns."""
+        today = date.today()
+        self.tree.delete(*self.tree.get_children())
+        for loan in self.library.active_loans():
+            member = self.library.members.get(loan.member_id)
+            book = self.library.books.get(loan.isbn)
+            overdue = loan.due_date < today
+            self.tree.insert(
+                "", "end", iid=f"{loan.isbn}|{loan.member_id}",
+                values=(
+                    f"{loan.member_id} - {member.name if member else '?'}",
+                    book.title if book else "?",
+                    loan.isbn,
+                    loan.issue_date.isoformat(),
+                    loan.due_date.isoformat(),
+                    "OVERDUE" if overdue else "On loan",
+                ),
+                tags=("overdue",) if overdue else (),
+            )
+        self.book_box["values"] = book_choices(self.library)
+        self.member_box["values"] = member_choices(self.library)
+
+    def on_select(self, _event: object = None) -> None:
+        """Copy the selected loan's book and member into the form."""
+        selected = self.tree.selection()
+        if not selected:
+            return
+        isbn, member_id = selected[0].split("|")
+        book = self.library.books.get(isbn)
+        member = self.library.members.get(member_id)
+        self.book.set(f"{isbn} - {book.title}" if book else isbn)
+        self.member.set(f"{member_id} - {member.name}" if member else member_id)
+
+    def issue(self) -> None:
+        """Issue the chosen book to the chosen member (FR4)."""
+        isbn, member_id = first_token(self.book.get()), first_token(self.member.get())
+
+        def action() -> str:
+            loan = self.library.issue_book(isbn, member_id)
+            title = self.library.get_book(loan.isbn).title
+            name = self.library.get_member(loan.member_id).name
+            return f"Issued '{title}' to {name}, due back {loan.due_date.isoformat()}."
+
+        self.app.perform(action)
+
+    def return_book(self) -> None:
+        """Return the chosen book; show the fine and who is next in the queue (FR5, FR6)."""
+        isbn, member_id = first_token(self.book.get()), first_token(self.member.get())
+
+        def action() -> str:
+            fine = self.library.return_book(isbn, member_id)
+            book = self.library.get_book(isbn)
+            lines = [f"'{book.title}' returned."]
+            lines.append(f"Fine due: £{fine:.2f}" if fine > 0 else "Returned on time - no fine.")
+            next_id = self.library.next_in_queue(book.isbn)
+            if next_id:
+                member = self.library.members.get(next_id)
+                lines.append(f"Next in the reservation queue: {member.name if member else ''} ({next_id}).")
+            messagebox.showinfo("Book returned", "\n".join(lines), parent=self)
+            return " ".join(lines)
+
+        self.app.perform(action)
+
+
 class LibraryApp(tk.Tk):
     """Main window: menu bar, one tab per feature area and a status bar."""
 
@@ -398,7 +513,7 @@ class LibraryApp(tk.Tk):
 
 
 # Tabs shown in the notebook, in order.
-TAB_CLASSES: List[Type[BaseTab]] = [BooksTab, MembersTab]
+TAB_CLASSES: List[Type[BaseTab]] = [BooksTab, MembersTab, LoansTab]
 
 
 def main(data_path: Path = DEFAULT_DATA_FILE) -> None:
