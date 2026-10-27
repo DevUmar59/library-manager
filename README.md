@@ -35,7 +35,7 @@ and the design in [docs/design.md](docs/design.md).
 ## How to run
 
 ```bash
-git clone https://github.com/<your-username>/library-manager.git
+git clone https://github.com/DevUmar59/library-manager.git
 cd library-manager
 
 python cli_app.py     # text-based version
