@@ -468,6 +468,56 @@ class ReservationsTab(BaseTab):
         self.app.perform(action)
 
 
+class OverdueTab(BaseTab):
+    """Overdue: loans past their due date with days overdue and fines (FR9)."""
+
+    title = "Overdue"
+    COLUMNS: Sequence[Column] = (
+        ("member", "Member", 170),
+        ("title", "Title", 230),
+        ("due", "Due date", 100),
+        ("days", "Days overdue", 100),
+        ("fine", "Fine", 80),
+    )
+
+    def __init__(self, parent: ttk.Notebook, app: "LibraryApp") -> None:
+        super().__init__(parent, app)
+        header = ttk.Frame(self)
+        header.grid(row=0, column=0, sticky="ew", pady=(0, 4))
+        self.heading = tk.StringVar()
+        ttk.Label(header, textvariable=self.heading).pack(side="left")
+        ttk.Button(header, text="Refresh", command=self.refresh).pack(side="right")
+        table, self.tree = self.make_table(self, self.COLUMNS)
+        table.grid(row=1, column=0, sticky="nsew")
+        self.total = tk.StringVar()
+        ttk.Label(self, textvariable=self.total, font=("TkDefaultFont", 10, "bold")).grid(
+            row=2, column=0, sticky="e", pady=(6, 0)
+        )
+        self.rowconfigure(1, weight=1)
+        self.columnconfigure(0, weight=1)
+
+    def refresh(self) -> None:
+        """Rebuild the overdue table as of today, oldest due date first."""
+        today = date.today()
+        rows = []
+        total = 0.0
+        for loan in self.library.overdue_loans(today):
+            member = self.library.members.get(loan.member_id)
+            book = self.library.books.get(loan.isbn)
+            fine = self.library.calculate_fine(loan, today)
+            total += fine
+            rows.append((f"{loan.isbn}|{loan.member_id}", (
+                f"{loan.member_id} - {member.name if member else '?'}",
+                book.title if book else loan.isbn,
+                loan.due_date.isoformat(),
+                (today - loan.due_date).days,
+                f"£{fine:.2f}",
+            )))
+        self.fill_table(self.tree, rows)
+        self.heading.set(f"Overdue loans as of today, {today:%d %B %Y}: {len(rows)}")
+        self.total.set(f"Total fines owed: £{total:.2f}")
+
+
 class LibraryApp(tk.Tk):
     """Main window: menu bar, one tab per feature area and a status bar."""
 
@@ -585,7 +635,7 @@ class LibraryApp(tk.Tk):
 
 
 # Tabs shown in the notebook, in order.
-TAB_CLASSES: List[Type[BaseTab]] = [BooksTab, MembersTab, LoansTab, ReservationsTab]
+TAB_CLASSES: List[Type[BaseTab]] = [BooksTab, MembersTab, LoansTab, ReservationsTab, OverdueTab]
 
 
 def main(data_path: Path = DEFAULT_DATA_FILE) -> None:
