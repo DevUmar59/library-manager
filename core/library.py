@@ -21,8 +21,9 @@ from __future__ import annotations
 import re
 from collections import deque
 from datetime import date, timedelta
-from typing import Deque, Dict, List, Optional
+from typing import Any, Callable, Deque, Dict, List, Optional
 
+from core.algorithms import binary_search, merge_sort
 from core.exceptions import NotFoundError, UnavailableError, ValidationError
 from core.models import Book, Loan, Member
 
@@ -32,6 +33,8 @@ MAX_LOANS_PER_MEMBER = 3   # business rule
 MIN_YEAR = 1000            # earliest publication year accepted (FR1)
 
 MEMBER_ID_PATTERN = re.compile(r"^M\d{3}$")
+SEARCH_FIELDS = ("title", "author", "isbn")
+SORT_FIELDS = ("title", "author", "year")
 
 
 def clean_isbn(isbn: str) -> str:
@@ -61,6 +64,13 @@ def validate_isbn(isbn: str) -> str:
 def normalise_member_id(member_id: str) -> str:
     """Return ``member_id`` stripped and upper-cased (so 'm004' matches 'M004')."""
     return str(member_id).strip().upper()
+
+
+def _sort_key(field: str) -> Callable[[Book], Any]:
+    """Return the merge-sort key for a book field (text fields case-insensitive)."""
+    if field == "year":
+        return lambda book: book.year
+    return lambda book: getattr(book, field).casefold()
 
 
 class Library:
@@ -261,14 +271,54 @@ class Library:
 
     # ---- Search & sort (FR7, FR8) ----------------------------------------
     def search_books(self, query: str, field: str = "title") -> List[Book]:
-        raise NotImplementedError
+        """Search books by title, author or ISBN (FR7).
+
+        - "title" / "author": partial, case-insensitive match; linear scan, O(n).
+        - "isbn": exact match (spaces/hyphens ignored); dict lookup, O(1) (NFR5).
+
+        Raises:
+            ValidationError: unknown field or blank query.
+        """
+        if field not in SEARCH_FIELDS:
+            raise ValidationError(f"Search field must be one of: {', '.join(SEARCH_FIELDS)}.")
+        query = str(query).strip()
+        if not query:
+            raise ValidationError("Search text must not be empty.")
+        if field == "isbn":
+            book = self.books.get(clean_isbn(query))
+            return [book] if book else []
+        needle = query.casefold()
+        return [book for book in self.books.values() if needle in getattr(book, field).casefold()]
 
     def sorted_books(self, field: str = "title", reverse: bool = False) -> List[Book]:
-        raise NotImplementedError
+        """Return all books sorted by title, author or year using merge sort (FR8, NFR5).
+
+        Text fields are compared case-insensitively. The sort is stable, so
+        books with equal keys keep their insertion order.
+
+        Raises:
+            ValidationError: unknown field.
+        """
+        if field not in SORT_FIELDS:
+            raise ValidationError(f"Sort field must be one of: {', '.join(SORT_FIELDS)}.")
+        return merge_sort(list(self.books.values()), key=_sort_key(field), reverse=reverse)
+
+    def find_book_by_title_exact(self, title: str) -> Optional[Book]:
+        """Return the book whose title matches exactly (ignoring case), or None (LO1).
+
+        Demonstrates binary search: the books are merge-sorted by title,
+        O(n log n), then searched in O(log n). If several books share a
+        title, one of them is returned.
+        """
+        by_title = merge_sort(list(self.books.values()), key=_sort_key("title"))
+        return binary_search(by_title, str(title).strip().casefold(), key=_sort_key("title"))
 
     # ---- Reports (FR9) ----------------------------------------------------
     def overdue_loans(self, today: Optional[date] = None) -> List[Loan]:
-        raise NotImplementedError
+        """Return active loans whose due date is before ``today``, oldest due first (FR9)."""
+        today = today or date.today()
+        overdue = [loan for loan in self.active_loans() if loan.due_date < today]
+        return merge_sort(overdue, key=lambda loan: loan.due_date)
 
     @staticmethod
     def calculate_fine(loan: Loan, today: Optional[date] = None) -> float:
