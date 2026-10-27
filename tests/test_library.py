@@ -358,3 +358,7 @@ class TestDictRoundTrip(unittest.TestCase):
         self.assertEqual(restored.to_dict(), library.to_dict())
         self.assertEqual(restored.reservation_queue(GREAT), ["M002", "M003"])
         self.assertEqual(library.to_dict()["reservations"], {GREAT: ["M002", "M003"]})
+
+
+if __name__ == "__main__":
+    unittest.main()
