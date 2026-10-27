@@ -3,8 +3,8 @@ Library Loans Manager — text-based (command-line) version.
 
 Run:  python cli_app.py
 
-STATUS: starter — menu skeleton only. Each option is wired up in the
-`feature/cli` branch once core/library.py is implemented.
+A thin front end over core.library.Library: every menu option asks for input,
+calls one Library method and prints the result. All rules live in core/ (NFR3).
 
 GenAI declaration: This file was drafted with assistance from Claude (Anthropic)
 and reviewed/modified by [Your Name]. See README.md for full GenAI statement.
@@ -24,6 +24,10 @@ from core.storage import DEFAULT_DATA_FILE
 
 # Each action takes the Library and returns True if it changed the data.
 Action = Callable[[Library], bool]
+
+# Menu key -> (library field name, label shown to the user)
+SEARCH_CHOICES = {"1": ("title", "Title (partial)"), "2": ("author", "Author (partial)"), "3": ("isbn", "ISBN (exact)")}
+SORT_CHOICES = {"1": ("title", "Title"), "2": ("author", "Author"), "3": ("year", "Year")}
 
 MENU = {
     "1": "Add a book",
@@ -180,6 +184,46 @@ def reserve_book(library: Library) -> bool:
     return True
 
 
+def search_books(library: Library) -> bool:
+    """Menu 7 — search by title, author (partial) or exact ISBN (FR7)."""
+    field, label = SEARCH_CHOICES[ask_choice("Search by:", {k: v[1] for k, v in SEARCH_CHOICES.items()})]
+    results = library.search_books(ask_text(f"{label} search text"), field)
+    print(f"{len(results)} book(s) found.")
+    print_books(results)
+    return False
+
+
+def list_books(library: Library) -> bool:
+    """Menu 8 — list all books sorted by title, author or year (FR8)."""
+    field, _ = SORT_CHOICES[ask_choice("Sort by:", {k: v[1] for k, v in SORT_CHOICES.items()})]
+    reverse = ask_choice("Order:", {"1": "Ascending", "2": "Descending"}) == "2"
+    print_books(library.sorted_books(field, reverse))
+    return False
+
+
+def show_overdue(library: Library) -> bool:
+    """Menu 9 — overdue loans with days overdue, fines and the total (FR9)."""
+    today = date.today()
+    rows = []
+    total = 0.0
+    for loan in library.overdue_loans(today):
+        member = library.members.get(loan.member_id)
+        book = library.books.get(loan.isbn)
+        fine = library.calculate_fine(loan, today)
+        total += fine
+        rows.append((
+            member.name if member else loan.member_id,
+            book.title if book else loan.isbn,
+            loan.due_date.isoformat(),
+            (today - loan.due_date).days,
+            f"£{fine:.2f}",
+        ))
+    print(f"Overdue loans as of {today.isoformat()}:")
+    print_table(("Member", "Title", "Due date", "Days overdue", "Fine"), rows)
+    print(f"Total fines owed: £{total:.2f}")
+    return False
+
+
 # Dispatch table: menu key -> action function (no long if/elif chain).
 ACTIONS: Dict[str, Action] = {
     "1": add_book,
@@ -188,6 +232,9 @@ ACTIONS: Dict[str, Action] = {
     "4": issue_book,
     "5": return_book,
     "6": reserve_book,
+    "7": search_books,
+    "8": list_books,
+    "9": show_overdue,
 }
 
 
@@ -208,10 +255,7 @@ def save(library: Library, path: Path) -> None:
 
 def run_action(library: Library, choice: str, path: Path) -> None:
     """Run one menu action, show any library error, and save after a change."""
-    action = ACTIONS.get(choice)
-    if action is None:
-        print(f"[{MENU[choice]}] - not available yet.")
-        return
+    action = ACTIONS[choice]
     try:
         if action(library):
             save(library, path)
