@@ -20,7 +20,7 @@ from pathlib import Path
 from tkinter import messagebox, ttk
 from typing import Callable, Iterable, List, Optional, Sequence, Tuple, Type
 
-from core.exceptions import LibraryError
+from core.exceptions import LibraryError, ValidationError
 from core.library import Library
 from core.storage import DEFAULT_DATA_FILE
 
@@ -83,6 +83,152 @@ def first_token(text: str) -> str:
     """Return the ID part of a combobox entry such as 'M001 - Alice Example'."""
     parts = text.split()
     return parts[0] if parts else ""
+
+
+def parse_int(text: str, label: str) -> int:
+    """Convert form text to int, raising ValidationError with a friendly message."""
+    try:
+        return int(text.strip())
+    except ValueError:
+        raise ValidationError(f"{label} must be a whole number.") from None
+
+
+class BooksTab(BaseTab):
+    """Books: sortable table, search box, add-book form and remove (FR1, FR2, FR7, FR8)."""
+
+    title = "Books"
+    COLUMNS: Sequence[Column] = (
+        ("isbn", "ISBN", 120),
+        ("title", "Title", 230),
+        ("author", "Author", 150),
+        ("year", "Year", 60),
+        ("available", "Available", 80),
+    )
+    SORTABLE = ("title", "author", "year")  # fields Library.sorted_books accepts
+
+    def __init__(self, parent: ttk.Notebook, app: "LibraryApp") -> None:
+        super().__init__(parent, app)
+        self.sort_field = "title"
+        self.sort_reverse = False
+        self.active_search: Optional[Tuple[str, str]] = None  # (query, field)
+
+        # Search bar (FR7)
+        bar = ttk.Frame(self)
+        bar.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 8))
+        ttk.Label(bar, text="Search").pack(side="left")
+        self.search_field = tk.StringVar(value="title")
+        ttk.Combobox(
+            bar, textvariable=self.search_field, values=("title", "author", "isbn"),
+            state="readonly", width=8,
+        ).pack(side="left", padx=4)
+        self.search_text = tk.StringVar()
+        entry = ttk.Entry(bar, textvariable=self.search_text)
+        entry.pack(side="left", padx=4, fill="x", expand=True)
+        entry.bind("<Return>", lambda _event: self.search())
+        ttk.Button(bar, text="Search", command=self.search).pack(side="left", padx=4)
+        ttk.Button(bar, text="Show all", command=self.clear_search).pack(side="left")
+
+        # Table; clicking Title/Author/Year headers sorts with merge sort (FR8)
+        table, self.tree = self.make_table(self, self.COLUMNS)
+        table.grid(row=1, column=0, sticky="nsew")
+        for field in self.SORTABLE:
+            self.tree.heading(field, command=lambda f=field: self.sort_by(f))
+
+        # Side panel: add form (FR1) and remove button (FR2)
+        side = ttk.Frame(self)
+        side.grid(row=1, column=1, sticky="ns", padx=(10, 0))
+        form = ttk.LabelFrame(side, text="Add a book", padding=8)
+        form.grid(row=0, column=0, sticky="ew")
+        self.fields = {name: tk.StringVar() for name in ("isbn", "title", "author", "year")}
+        self.copies = tk.StringVar(value="1")
+        labels = (("isbn", "ISBN-13"), ("title", "Title"), ("author", "Author"), ("year", "Year"))
+        for row, (name, label) in enumerate(labels):
+            self.add_field(form, row, label, ttk.Entry(form, textvariable=self.fields[name], width=24))
+        self.add_field(form, 4, "Copies", ttk.Spinbox(form, from_=1, to=999, textvariable=self.copies, width=6))
+        ttk.Button(form, text="Add book", command=self.add_book).grid(
+            row=5, column=0, columnspan=2, sticky="ew", pady=(8, 0)
+        )
+        remove = ttk.LabelFrame(side, text="Remove", padding=8)
+        remove.grid(row=1, column=0, sticky="ew", pady=(10, 0))
+        ttk.Button(remove, text="Remove selected book", command=self.remove_selected).pack(fill="x")
+
+        self.rowconfigure(1, weight=1)
+        self.columnconfigure(0, weight=1)
+
+    def refresh(self) -> None:
+        """Show books sorted by the current header, filtered by the active search."""
+        books = self.library.sorted_books(self.sort_field, self.sort_reverse)
+        if self.active_search:
+            query, field = self.active_search
+            matches = {book.isbn for book in self.library.search_books(query, field)}
+            books = [book for book in books if book.isbn in matches]
+        self.fill_table(self.tree, (
+            (b.isbn, (b.isbn, b.title, b.author, b.year, f"{b.available_copies}/{b.total_copies}"))
+            for b in books
+        ))
+        for field, heading, _width in self.COLUMNS:  # arrow marks the sorted column
+            arrow = (" ▼" if self.sort_reverse else " ▲") if field == self.sort_field else ""
+            self.tree.heading(field, text=heading + arrow)
+
+    def sort_by(self, field: str) -> None:
+        """Header click: sort by ``field``; clicking the same header toggles asc/desc."""
+        self.sort_reverse = not self.sort_reverse if field == self.sort_field else False
+        self.sort_field = field
+        self.refresh()
+        order = "descending" if self.sort_reverse else "ascending"
+        self.app.set_status(f"Books sorted by {field}, {order}.")
+
+    def search(self) -> None:
+        """Run the search in the search box (FR7)."""
+        query, field = self.search_text.get(), self.search_field.get()
+        try:
+            count = len(self.library.search_books(query, field))
+        except LibraryError as exc:
+            messagebox.showerror("Search", str(exc), parent=self)
+            return
+        self.active_search = (query, field)
+        self.refresh()
+        self.app.set_status(f"{count} book(s) found for {field} '{query.strip()}'.")
+
+    def clear_search(self) -> None:
+        """Show every book again."""
+        self.active_search = None
+        self.search_text.set("")
+        self.refresh()
+        self.app.set_status(f"Showing all {len(self.library.books)} books.")
+
+    def add_book(self) -> None:
+        """Add the book in the form (FR1)."""
+        values = {name: var.get() for name, var in self.fields.items()}
+
+        def action() -> str:
+            year = parse_int(values["year"], "Year")
+            copies = parse_int(self.copies.get(), "Copies")
+            book = self.library.add_book(values["isbn"], values["title"], values["author"], year, copies)
+            return f"Added '{book.title}' ({book.isbn}) with {book.total_copies} copies."
+
+        if self.app.perform(action):
+            for var in self.fields.values():
+                var.set("")
+            self.copies.set("1")
+
+    def remove_selected(self) -> None:
+        """Remove the selected book after confirmation (FR2)."""
+        selected = self.tree.selection()
+        if not selected:
+            messagebox.showinfo("Remove book", "Select a book in the table first.", parent=self)
+            return
+        book = self.library.books.get(selected[0])
+        if book is None or not messagebox.askyesno(
+            "Remove book", f"Remove '{book.title}' by {book.author}?", parent=self
+        ):
+            return
+
+        def action() -> str:
+            self.library.remove_book(book.isbn)
+            return f"Removed '{book.title}'."
+
+        self.app.perform(action)
 
 
 class LibraryApp(tk.Tk):
@@ -202,7 +348,7 @@ class LibraryApp(tk.Tk):
 
 
 # Tabs shown in the notebook, in order.
-TAB_CLASSES: List[Type[BaseTab]] = []
+TAB_CLASSES: List[Type[BaseTab]] = [BooksTab]
 
 
 def main(data_path: Path = DEFAULT_DATA_FILE) -> None:
