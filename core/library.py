@@ -21,11 +21,13 @@ from __future__ import annotations
 import re
 from collections import deque
 from datetime import date, timedelta
+from pathlib import Path
 from typing import Any, Callable, Deque, Dict, List, Optional
 
 from core.algorithms import binary_search, merge_sort
-from core.exceptions import NotFoundError, UnavailableError, ValidationError
+from core.exceptions import LibraryError, NotFoundError, UnavailableError, ValidationError
 from core.models import Book, Loan, Member
+from core.storage import DEFAULT_DATA_FILE, SAMPLE_DATA_FILE, load_data, save_data
 
 LOAN_PERIOD_DAYS = 14      # standard loan length
 FINE_PER_DAY = 0.20        # £ per day overdue
@@ -333,8 +335,52 @@ class Library:
 
     # ---- Persistence (FR10) ----------------------------------------------
     def to_dict(self) -> dict:
-        raise NotImplementedError
+        """Return all data in the JSON storage format (FR10); queues become lists."""
+        return {
+            "books": [book.to_dict() for book in self.books.values()],
+            "members": [member.to_dict() for member in self.members.values()],
+            "loans": [loan.to_dict() for loan in self.loans],
+            "reservations": {isbn: list(queue) for isbn, queue in self.reservations.items() if queue},
+        }
 
     @classmethod
     def from_dict(cls, data: dict) -> "Library":
-        raise NotImplementedError
+        """Build a Library from data in the JSON storage format (FR10).
+
+        Raises:
+            LibraryError: if a record is missing fields or has wrong values.
+        """
+        library = cls()
+        try:
+            for raw in data.get("books", []):
+                book = Book.from_dict(raw)
+                library.books[book.isbn] = book
+            for raw in data.get("members", []):
+                member = Member.from_dict(raw)
+                library.members[member.member_id] = member
+            library.loans = [Loan.from_dict(raw) for raw in data.get("loans", [])]
+            library.reservations = {
+                isbn: deque(queue) for isbn, queue in data.get("reservations", {}).items() if queue
+            }
+        except (KeyError, TypeError, ValueError, AttributeError) as exc:
+            raise LibraryError(f"Data file contains an invalid record: {exc}") from exc
+        return library
+
+    @classmethod
+    def load(cls, path: Path = DEFAULT_DATA_FILE, sample_path: Path = SAMPLE_DATA_FILE) -> "Library":
+        """Load a Library from ``path`` (FR10).
+
+        On first run, when ``path`` does not exist yet, the fictional sample
+        data in ``sample_path`` is loaded instead (or an empty library if that
+        is missing too).
+
+        Raises:
+            LibraryError: if the file is corrupt.
+        """
+        path = Path(path)
+        source = path if path.exists() else Path(sample_path)
+        return cls.from_dict(load_data(source))
+
+    def save(self, path: Path = DEFAULT_DATA_FILE) -> None:
+        """Save all data to ``path`` using the safe temp-file write (FR10, NFR6)."""
+        save_data(self.to_dict(), Path(path))
