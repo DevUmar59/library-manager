@@ -141,11 +141,53 @@ def register_member(library: Library) -> bool:
     return True
 
 
+def issue_book(library: Library) -> bool:
+    """Menu 4 — lend a book to a member (FR4)."""
+    isbn = ask_text("ISBN")
+    member_id = ask_text("Member ID")
+    loan = library.issue_book(isbn, member_id)
+    book = library.get_book(loan.isbn)
+    member = library.get_member(loan.member_id)
+    print(f"Issued '{book.title}' to {member.name}. Due back on {loan.due_date.isoformat()}.")
+    return True
+
+
+def return_book(library: Library) -> bool:
+    """Menu 5 — return a book, show any fine and who is next in the queue (FR5, FR6)."""
+    isbn = ask_text("ISBN")
+    member_id = ask_text("Member ID")
+    fine = library.return_book(isbn, member_id)
+    book = library.get_book(isbn)
+    if fine > 0:
+        print(f"Returned '{book.title}' late. Fine due: £{fine:.2f}")
+    else:
+        print(f"Returned '{book.title}' on time. No fine.")
+    next_id = library.next_in_queue(book.isbn)
+    if next_id:
+        next_member = library.members.get(next_id)
+        name = next_member.name if next_member else next_id
+        print(f"Next in the reservation queue: {name} ({next_id}). Please hold the book for them.")
+    return True
+
+
+def reserve_book(library: Library) -> bool:
+    """Menu 6 — join the FIFO reservation queue for an unavailable book (FR6)."""
+    isbn = ask_text("ISBN")
+    member_id = ask_text("Member ID")
+    position = library.reserve_book(isbn, member_id)
+    book = library.get_book(isbn)
+    print(f"Reserved '{book.title}'. Position in queue: {position}.")
+    return True
+
+
 # Dispatch table: menu key -> action function (no long if/elif chain).
 ACTIONS: Dict[str, Action] = {
     "1": add_book,
     "2": remove_book,
     "3": register_member,
+    "4": issue_book,
+    "5": return_book,
+    "6": reserve_book,
 }
 
 
