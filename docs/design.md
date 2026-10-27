@@ -44,10 +44,10 @@ flowchart TD
 ```mermaid
 classDiagram
     class Library {
-        +dict~str, Book~ books
-        +dict~str, Member~ members
+        +dict books
+        +dict members
         +list~Loan~ loans
-        +dict~str, deque~ reservations
+        +dict reservations
         +add_book(isbn, title, author, year, copies) Book
         +remove_book(isbn)
         +register_member(member_id, name) Member
