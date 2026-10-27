@@ -1,0 +1,37 @@
+# --- Python (based on GitHub's Python template) ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Test / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# --- Project specific ---
+# Live data written by the app (sample_data.json IS tracked)
+data/library_data.json
+data/*.tmp
+
+# Assessment 1 submission material: video and report stay out of the repo
+submission/*
+!submission/README.md
+*.zip
+
+# Local AI task prompt (not part of the project)
+CLAUDE_CODE_PROMPT.md
