@@ -396,6 +396,78 @@ class LoansTab(BaseTab):
         self.app.perform(action)
 
 
+class ReservationsTab(BaseTab):
+    """Reservations: reserve form and the FIFO queue of each book (FR6)."""
+
+    title = "Reservations"
+    COLUMNS: Sequence[Column] = (
+        ("position", "Position", 70),
+        ("member_id", "Member ID", 90),
+        ("name", "Name", 200),
+    )
+
+    def __init__(self, parent: ttk.Notebook, app: "LibraryApp") -> None:
+        super().__init__(parent, app)
+        ttk.Label(self, text="Reservation queues (first in line is served first)").grid(
+            row=0, column=0, sticky="w", pady=(0, 4)
+        )
+        # show="tree headings": one parent row per book, its queue as child rows
+        table, self.tree = self.make_table(self, self.COLUMNS, show="tree headings")
+        self.tree.heading("#0", text="Book", anchor="w")
+        self.tree.column("#0", width=260, stretch=True)
+        table.grid(row=1, column=0, sticky="nsew")
+
+        form = ttk.LabelFrame(self, text="Reserve a book", padding=8)
+        form.grid(row=1, column=1, sticky="n", padx=(10, 0))
+        self.book = tk.StringVar()
+        self.member = tk.StringVar()
+        self.book_box = ttk.Combobox(form, textvariable=self.book, width=30)
+        self.member_box = ttk.Combobox(form, textvariable=self.member, width=30)
+        self.add_field(form, 0, "Book", self.book_box)
+        self.add_field(form, 1, "Member", self.member_box)
+        ttk.Label(form, text="Only books with no copies available\ncan be reserved.", foreground="gray").grid(
+            row=2, column=0, columnspan=2, sticky="w", pady=(4, 0)
+        )
+        ttk.Button(form, text="Reserve", command=self.reserve).grid(
+            row=3, column=0, columnspan=2, sticky="ew", pady=(8, 0)
+        )
+        self.rowconfigure(1, weight=1)
+        self.columnconfigure(0, weight=1)
+
+    def refresh(self) -> None:
+        """Show each book's queue in order and update the dropdowns."""
+        self.tree.delete(*self.tree.get_children())
+        for book in self.library.sorted_books("title"):
+            queue = self.library.reservation_queue(book.isbn)
+            if not queue:
+                continue
+            parent = self.tree.insert(
+                "", "end", iid=book.isbn, text=f"{book.title} ({book.isbn})", open=True,
+                values=("", "", f"{len(queue)} waiting"),
+            )
+            for position, member_id in enumerate(queue, start=1):
+                member = self.library.members.get(member_id)
+                self.tree.insert(
+                    parent, "end", iid=f"{book.isbn}|{member_id}",
+                    values=(position, member_id, member.name if member else "?"),
+                )
+        if not self.tree.get_children():
+            self.tree.insert("", "end", text="(no reservations)")
+        self.book_box["values"] = book_choices(self.library)
+        self.member_box["values"] = member_choices(self.library)
+
+    def reserve(self) -> None:
+        """Add the chosen member to the chosen book's queue (FR6)."""
+        isbn, member_id = first_token(self.book.get()), first_token(self.member.get())
+
+        def action() -> str:
+            position = self.library.reserve_book(isbn, member_id)
+            title = self.library.get_book(isbn).title
+            return f"Reserved '{title}' for {member_id.upper()}: position {position} in the queue."
+
+        self.app.perform(action)
+
+
 class LibraryApp(tk.Tk):
     """Main window: menu bar, one tab per feature area and a status bar."""
 
@@ -513,7 +585,7 @@ class LibraryApp(tk.Tk):
 
 
 # Tabs shown in the notebook, in order.
-TAB_CLASSES: List[Type[BaseTab]] = [BooksTab, MembersTab, LoansTab]
+TAB_CLASSES: List[Type[BaseTab]] = [BooksTab, MembersTab, LoansTab, ReservationsTab]
 
 
 def main(data_path: Path = DEFAULT_DATA_FILE) -> None:
