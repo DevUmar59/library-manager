@@ -19,7 +19,7 @@ and reviewed/modified by [Your Name]. See README.md for full GenAI statement.
 from __future__ import annotations
 
 import re
-from datetime import date
+from datetime import date, timedelta
 from typing import Deque, Dict, List, Optional
 
 from core.exceptions import NotFoundError, UnavailableError, ValidationError
@@ -155,11 +155,61 @@ class Library:
 
     # ---- Loans (FR4, FR5) -------------------------------------------------
     def issue_book(self, isbn: str, member_id: str, today: Optional[date] = None) -> Loan:
-        raise NotImplementedError
+        """Lend one copy of a book to a member (FR4).
+
+        The due date is ``today + LOAN_PERIOD_DAYS``.
+
+        Raises:
+            NotFoundError: unknown ISBN or member.
+            UnavailableError: no copies available, member already has
+                MAX_LOANS_PER_MEMBER active loans, or already holds this book.
+        """
+        today = today or date.today()
+        book = self.get_book(isbn)
+        member = self.get_member(member_id)
+        member_loans = self.active_loans(member.member_id)
+        if any(loan.isbn == book.isbn for loan in member_loans):
+            raise UnavailableError(f"{member.name} already has '{book.title}' on loan.")
+        if len(member_loans) >= MAX_LOANS_PER_MEMBER:
+            raise UnavailableError(
+                f"{member.name} already has {MAX_LOANS_PER_MEMBER} books on loan (the maximum)."
+            )
+        if book.available_copies <= 0:
+            raise UnavailableError(f"No copies of '{book.title}' are available. You can reserve it.")
+
+        loan = Loan(book.isbn, member.member_id, today, today + timedelta(days=LOAN_PERIOD_DAYS))
+        self.loans.append(loan)
+        book.available_copies -= 1
+        return loan
 
     def return_book(self, isbn: str, member_id: str, today: Optional[date] = None) -> float:
-        """Return the book and the fine owed (0.0 if on time)."""
-        raise NotImplementedError
+        """Return the book and the fine owed (0.0 if on time) (FR5).
+
+        Raises:
+            NotFoundError: this member has no active loan of this book.
+        """
+        today = today or date.today()
+        isbn = clean_isbn(isbn)
+        member_id = normalise_member_id(member_id)
+        loan = next(
+            (l for l in self.active_loans(member_id) if l.isbn == isbn),
+            None,
+        )
+        if loan is None:
+            raise NotFoundError(f"Member {member_id} has no active loan of ISBN {isbn}.")
+        loan.return_date = today
+        book = self.books.get(isbn)
+        if book is not None:
+            book.available_copies = min(book.available_copies + 1, book.total_copies)
+        return self.calculate_fine(loan, today)
+
+    def active_loans(self, member_id: Optional[str] = None) -> List[Loan]:
+        """Return loans not yet returned, optionally only those of one member."""
+        wanted = normalise_member_id(member_id) if member_id is not None else None
+        return [
+            loan for loan in self.loans
+            if not loan.is_returned and (wanted is None or loan.member_id == wanted)
+        ]
 
     # ---- Reservations (FR6) -----------------------------------------------
     def reserve_book(self, isbn: str, member_id: str) -> int:
@@ -179,7 +229,14 @@ class Library:
 
     @staticmethod
     def calculate_fine(loan: Loan, today: Optional[date] = None) -> float:
-        raise NotImplementedError
+        """Return the fine for a loan: days late x FINE_PER_DAY, to 2 dp (FR5, FR9).
+
+        A returned loan is measured to its return date, an active loan to
+        ``today``. The fine is never negative (returning early costs nothing).
+        """
+        end = loan.return_date or today or date.today()
+        days_late = max(0, (end - loan.due_date).days)
+        return round(days_late * FINE_PER_DAY, 2)
 
     # ---- Persistence (FR10) ----------------------------------------------
     def to_dict(self) -> dict:
