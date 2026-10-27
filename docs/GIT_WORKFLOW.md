@@ -19,13 +19,14 @@ and a milestone called `v1.0`.
 
 ## Stage-by-stage plan
 
-| Stage | Branch | Example commit messages | Closes |
-|-------|--------|-------------------------|--------|
-| 1 | `feature/core` | "Implement merge sort and binary search" · "Add JSON load/save with safe write" · "Add book and member management to Library" · "Add issue/return with fine calculation" · "Add FIFO reservation queue" | FR1–FR10 logic |
-| 2 | `feature/cli` | "Wire add/remove book to text menu" · "Add search and sorted listing to text version" · "Add input validation to text menu" | text version |
-| 3 | `feature/tests` | "Add unit tests for algorithms" · "Add tests for loans, fines and reservations" | testing |
-| 4 | `feature/gui` | "Add Books tab with table and form" · "Add Loans tab to GUI" · "Add overdue view to GUI" | GUI version |
-| 5 | `docs/readme` | "Update README with run instructions and screenshots" | docs |
+| Stage | Branch | Example commit messages | Closes | Status |
+|-------|--------|-------------------------|--------|--------|
+| 0 | `main` | "Initial project skeleton: core package, CLI/GUI stubs, README, .gitignore" | set-up | Done |
+| 1 | `feature/core` | "Implement stable merge sort and iterative binary search" · "Add JSON load and atomic save to storage module" · "Add FIFO reservation queue to Library" | Implement core logic (FR1–FR10) | Done |
+| 2 | `feature/cli` | "Add input helpers and table printing to text version" · "Add issue, return and reserve actions to text menu" | Text-based version | Done |
+| 3 | `feature/tests` | "Add unit tests for merge sort and binary search" · "Add tests for loans, fines and reservations" | Unit tests (76 tests) | Done |
+| 4 | `feature/gui` | "Add Books tab with sortable table, search and add/remove form" · "Add Overdue tab with fines table and total as of today" | GUI version | Done |
+| 5 | `docs/final` | "Add design document with data structures, algorithms and diagrams" | Final documentation | Done |
 
 For each stage:
 
