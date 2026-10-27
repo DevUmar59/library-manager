@@ -1,0 +1,86 @@
+Library Loans Manager - unit test results
+Command: python -m unittest discover -s tests -v
+Python: 3.14.6 on Windows 11
+Date: 2026-10-27
+
+test_finds_middle_first_and_last_items (test_algorithms.TestBinarySearch.test_finds_middle_first_and_last_items) ... ok
+test_returns_none_on_empty_list (test_algorithms.TestBinarySearch.test_returns_none_on_empty_list) ... ok
+test_returns_none_when_not_found (test_algorithms.TestBinarySearch.test_returns_none_when_not_found) ... ok
+test_uses_key_function (test_algorithms.TestBinarySearch.test_uses_key_function) ... ok
+test_does_not_mutate_input_and_returns_new_list (test_algorithms.TestMergeSort.test_does_not_mutate_input_and_returns_new_list) ... ok
+test_empty_list_returns_empty_list (test_algorithms.TestMergeSort.test_empty_list_returns_empty_list) ... ok
+test_matches_builtin_sorted_on_random_data (test_algorithms.TestMergeSort.test_matches_builtin_sorted_on_random_data) ... ok
+test_reverse_is_still_stable (test_algorithms.TestMergeSort.test_reverse_is_still_stable) ... ok
+test_single_item_list (test_algorithms.TestMergeSort.test_single_item_list) ... ok
+test_sorts_descending_with_reverse (test_algorithms.TestMergeSort.test_sorts_descending_with_reverse) ... ok
+test_sorts_numbers_ascending (test_algorithms.TestMergeSort.test_sorts_numbers_ascending) ... ok
+test_stable_for_duplicate_keys (test_algorithms.TestMergeSort.test_stable_for_duplicate_keys) ... ok
+test_add_book_blank_title_or_author_rejected (test_library.TestBooks.test_add_book_blank_title_or_author_rejected) ... ok
+test_add_book_sets_available_copies_to_total (test_library.TestBooks.test_add_book_sets_available_copies_to_total) ... ok
+test_add_duplicate_isbn_rejected (test_library.TestBooks.test_add_duplicate_isbn_rejected) ... ok
+test_remove_book_deletes_it (test_library.TestBooks.test_remove_book_deletes_it) ... ok
+test_remove_book_on_loan_rejected (test_library.TestBooks.test_remove_book_on_loan_rejected) ... ok
+test_remove_unknown_book_raises_not_found (test_library.TestBooks.test_remove_unknown_book_raises_not_found) ... ok
+test_year_boundaries_1000_and_current_year_accepted (test_library.TestBooks.test_year_boundaries_1000_and_current_year_accepted) ... ok
+test_year_out_of_range_rejected (test_library.TestBooks.test_year_out_of_range_rejected) ... ok
+test_zero_copies_rejected (test_library.TestBooks.test_zero_copies_rejected) ... ok
+test_to_dict_from_dict_round_trip (test_library.TestDictRoundTrip.test_to_dict_from_dict_round_trip) ... ok
+test_fine_after_return_uses_return_date_not_today (test_library.TestFines.test_fine_after_return_uses_return_date_not_today) ... ok
+test_fine_is_20p_one_day_late (test_library.TestFines.test_fine_is_20p_one_day_late) ... ok
+test_fine_is_zero_on_due_date (test_library.TestFines.test_fine_is_zero_on_due_date) ... ok
+test_fine_is_zero_when_early (test_library.TestFines.test_fine_is_zero_when_early) ... ok
+test_fine_ten_days_late_rounded_to_2dp (test_library.TestFines.test_fine_ten_days_late_rounded_to_2dp) ... ok
+test_return_book_returns_fine_for_late_return (test_library.TestFines.test_return_book_returns_fine_for_late_return) ... ok
+test_invalid_checksum_is_rejected (test_library.TestIsbnValidation.test_invalid_checksum_is_rejected) ... ok
+test_valid_isbn_with_hyphens_is_normalised (test_library.TestIsbnValidation.test_valid_isbn_with_hyphens_is_normalised) ... ok
+test_wrong_length_or_letters_rejected (test_library.TestIsbnValidation.test_wrong_length_or_letters_rejected) ... ok
+test_issue_beyond_three_loan_limit_rejected (test_library.TestLoans.test_issue_beyond_three_loan_limit_rejected) ... ok
+test_issue_same_book_twice_to_member_rejected (test_library.TestLoans.test_issue_same_book_twice_to_member_rejected) ... ok
+test_issue_sets_due_date_and_reduces_available (test_library.TestLoans.test_issue_sets_due_date_and_reduces_available) ... ok
+test_issue_unknown_book_or_member_raises_not_found (test_library.TestLoans.test_issue_unknown_book_or_member_raises_not_found) ... ok
+test_issue_when_no_copies_left_rejected (test_library.TestLoans.test_issue_when_no_copies_left_rejected) ... ok
+test_return_restores_copy_and_records_date (test_library.TestLoans.test_return_restores_copy_and_records_date) ... ok
+test_return_without_active_loan_raises_not_found (test_library.TestLoans.test_return_without_active_loan_raises_not_found) ... ok
+test_bad_member_id_format_rejected (test_library.TestMembers.test_bad_member_id_format_rejected) ... ok
+test_blank_member_name_rejected (test_library.TestMembers.test_blank_member_name_rejected) ... ok
+test_duplicate_member_id_rejected (test_library.TestMembers.test_duplicate_member_id_rejected) ... ok
+test_register_member_normalises_id (test_library.TestMembers.test_register_member_normalises_id) ... ok
+test_loan_due_today_is_not_overdue (test_library.TestOverdue.test_loan_due_today_is_not_overdue) ... ok
+test_overdue_sorted_by_due_date (test_library.TestOverdue.test_overdue_sorted_by_due_date) ... ok
+test_returned_loans_are_not_overdue (test_library.TestOverdue.test_returned_loans_are_not_overdue) ... ok
+test_duplicate_reservation_rejected (test_library.TestReservations.test_duplicate_reservation_rejected) ... ok
+test_member_holding_book_cannot_reserve_it (test_library.TestReservations.test_member_holding_book_cannot_reserve_it) ... ok
+test_only_front_of_queue_may_borrow_returned_book (test_library.TestReservations.test_only_front_of_queue_may_borrow_returned_book) ... ok
+test_queue_served_in_fifo_order (test_library.TestReservations.test_queue_served_in_fifo_order) ... ok
+test_remove_book_clears_its_queue (test_library.TestReservations.test_remove_book_clears_its_queue) ... ok
+test_reserve_available_book_rejected (test_library.TestReservations.test_reserve_available_book_rejected) ... ok
+test_reserve_returns_fifo_positions (test_library.TestReservations.test_reserve_returns_fifo_positions) ... ok
+test_find_book_by_title_exact_uses_binary_search (test_library.TestSearchAndSort.test_find_book_by_title_exact_uses_binary_search) ... ok
+test_search_author_partial_returns_all_matches (test_library.TestSearchAndSort.test_search_author_partial_returns_all_matches) ... ok
+test_search_bad_field_or_blank_query_rejected (test_library.TestSearchAndSort.test_search_bad_field_or_blank_query_rejected) ... ok
+test_search_isbn_exact_ignores_hyphens (test_library.TestSearchAndSort.test_search_isbn_exact_ignores_hyphens) ... ok
+test_search_isbn_partial_finds_nothing (test_library.TestSearchAndSort.test_search_isbn_partial_finds_nothing) ... ok
+test_search_no_match_returns_empty_list (test_library.TestSearchAndSort.test_search_no_match_returns_empty_list) ... ok
+test_search_title_partial_and_case_insensitive (test_library.TestSearchAndSort.test_search_title_partial_and_case_insensitive) ... ok
+test_sorted_bad_field_rejected (test_library.TestSearchAndSort.test_sorted_bad_field_rejected) ... ok
+test_sorted_by_author_keeps_insertion_order_for_ties (test_library.TestSearchAndSort.test_sorted_by_author_keeps_insertion_order_for_ties) ... ok
+test_sorted_by_title_ascending_case_insensitive (test_library.TestSearchAndSort.test_sorted_by_title_ascending_case_insensitive) ... ok
+test_sorted_by_year_descending (test_library.TestSearchAndSort.test_sorted_by_year_descending) ... ok
+test_book_round_trip (test_models.TestModels.test_book_round_trip) ... ok
+test_loan_round_trip_keeps_dates (test_models.TestModels.test_loan_round_trip_keeps_dates) ... ok
+test_member_round_trip (test_models.TestModels.test_member_round_trip) ... ok
+test_sample_data_loads_into_models (test_models.TestModels.test_sample_data_loads_into_models) ... ok
+test_invalid_record_raises_library_error (test_storage.TestLibraryPersistence.test_invalid_record_raises_library_error) ... ok
+test_load_without_data_file_uses_sample_data (test_storage.TestLibraryPersistence.test_load_without_data_file_uses_sample_data) ... ok
+test_save_load_round_trip_keeps_loans_and_queue (test_storage.TestLibraryPersistence.test_save_load_round_trip_keeps_loans_and_queue) ... ok
+test_corrupt_json_raises_library_error (test_storage.TestStorage.test_corrupt_json_raises_library_error) ... ok
+test_missing_file_returns_empty_structure (test_storage.TestStorage.test_missing_file_returns_empty_structure) ... ok
+test_missing_section_raises_library_error (test_storage.TestStorage.test_missing_section_raises_library_error) ... ok
+test_save_creates_parent_folder_and_leaves_no_temp_file (test_storage.TestStorage.test_save_creates_parent_folder_and_leaves_no_temp_file) ... ok
+test_save_then_load_returns_same_data (test_storage.TestStorage.test_save_then_load_returns_same_data) ... ok
+test_wrong_section_type_raises_library_error (test_storage.TestStorage.test_wrong_section_type_raises_library_error) ... ok
+
+----------------------------------------------------------------------
+Ran 76 tests
+
+OK
